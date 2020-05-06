@@ -319,13 +319,18 @@ def binomial_vec(M, k, p0):
     p0 probability (M=avg orbit crossings, k=N of transits, 
     p0=prob of transit. M is array."""
     dummy = np.arange(k-1)+1
+
     if k == 0:
         Mchoosek=np.ones(M.shape)
     elif k == 1:
         Mchoosek=np.ones(M.shape)*M
     else:
         # product over dummy (the factorial) axis
-        numerator = np.prod(M[:, np.newaxis]-dummy[np.newaxis,:], axis=-1)*M
+        ndims = M.ndim
+        newdims = np.append(np.ones(ndims), -1).astype(int)
+        numerator = np.prod(np.expand_dims(M, -1) - dummy.reshape(newdims), 
+                            axis=-1)*M
+#        numerator = np.prod(M[:, np.newaxis]-dummy[np.newaxis,:], axis=-1)*M
         denom = np.prod(np.arange(1,k+1))
         Mchoosek = numerator/denom
     return Mchoosek * p0**k * (1.-p0)**(M-k)
@@ -713,20 +718,43 @@ def unit_test_check_all(m1, m2, r1, r2, Pb, Pp, i_b, di, Tobs, fduty, k,
     fone1, ftwo1, Delta_Omega1, fone2, ftwo2, Delta_Omega2, \
             del_Omega1, del_Omega2, n1, n2, Pstar1, Pstar2, \
             Pcross1, Pcross2 = ball1
+            
+    pk_star1 = get_Pk_vec(n1, k, fduty*Pstar1) 
+    pk_star2 = get_Pk_vec(n2, k, fduty*Pstar2)
+    
+    _pk_star1, _pk_star2 = pk_star1*0., pk_star2*0.
+    
     _fone1, _ftwo1, _Delta_Omega1, _fone2, _ftwo2, _Delta_Omega2, \
         _del_Omega1, _del_Omega2, _n1, _n2, _Pstar1, _Pstar2, \
         _Pcross1, _Pcross2 = fone1*0., ftwo1*0., Delta_Omega1*0., \
                             fone2*0., ftwo2*0., Delta_Omega2*0., \
                             del_Omega1*0., del_Omega2*0., n1*0., n2*0., \
                             Pstar1*0., Pstar2*0., Pcross1*0., Pcross2*0.
-    for ii in range(len(fone1)):
-        _fone1[ii], _ftwo1[ii], _Delta_Omega1[ii], \
-            _fone2[ii], _ftwo2[ii], _Delta_Omega2[ii], \
-            _del_Omega1[ii], _del_Omega2[ii], _n1[ii], _n2[ii], \
-            _Pstar1[ii], _Pstar2[ii], \
-            _Pcross1[ii], _Pcross2[ii] = unit_test_get_all(m1, m2, r1, r2, 
-                                                            Pb, Pp, i_b, di[ii], 
-                                                            Tobs, fduty, k)
+    if fone1.ndim==2:
+        for ii in range(fone1.shape[0]):
+            for jj in range(fone1.shape[1]):
+                _fone1[ii,jj], _ftwo1[ii,jj], _Delta_Omega1[ii,jj], \
+                    _fone2[ii,jj], _ftwo2[ii,jj], _Delta_Omega2[ii,jj], \
+                    _del_Omega1[ii,jj], _del_Omega2[ii,jj], _n1[ii,jj], _n2[ii,jj], \
+                    _Pstar1[ii,jj], _Pstar2[ii,jj], \
+                    _Pcross1[ii,jj], _Pcross2[ii,jj] = unit_test_get_all(m1, m2, r1, r2, 
+                                                                    Pb, Pp[ii,jj], i_b, di[ii,jj], 
+
+                                                                    Tobs, fduty[ii,jj], k)
+                _pk_star1[ii,jj] = get_Pk(_n1[ii,jj], k, fduty*[ii,jj]*_Pstar1[ii,jj])
+                _pk_star2[ii,jj] = get_Pk(_n2[ii,jj], k, fduty*[ii,jj]*_Pstar2[ii,jj])
+    elif fone1.ndim==1:
+        for ii in range(len(fone1)):
+            _fone1[ii], _ftwo1[ii], _Delta_Omega1[ii], \
+                _fone2[ii], _ftwo2[ii], _Delta_Omega2[ii], \
+                _del_Omega1[ii], _del_Omega2[ii], _n1[ii], _n2[ii], \
+                _Pstar1[ii], _Pstar2[ii], \
+                _Pcross1[ii], _Pcross2[ii] = unit_test_get_all(m1, m2, r1, r2, 
+                                                                Pb, Pp, i_b, di[ii], 
+                                                                Tobs, fduty, k)
+            _pk_star1[ii] = get_Pk(_n1[ii], k, fduty*[ii]*_Pstar1[ii])
+            _pk_star2[ii] = get_Pk(_n2[ii], k, fduty*[ii]*_Pstar2[ii])
+                                                                
     passtest=True
     if (abs(_fone1-fone1)>tol).sum()>0:
         print("get_f1; star1 failed")
@@ -770,4 +798,11 @@ def unit_test_check_all(m1, m2, r1, r2, Pb, Pp, i_b, di, Tobs, fduty, k,
     if (abs(_Pcross2-Pcross2)>tol).sum()>0:
         print("get_Pcross2 failed") 
         passtest*=False
+    if (abs(_pk_star1-pk_star1)>tol).sum()>0:
+        print("get_Pk; star1 failed")
+        passtest*=False
+    if (abs(_pk_star2-pk_star2)>tol).sum()>0:
+        print("get_Pk; star1 failed")
+        passtest*=False
+
     return passtest
